@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import 'components/particle_system_shape.dart';
-import 'components/value_range.dart';
+// import 'components/value_range.dart';
 import 'particle.dart';
 
 class ParticleSystem {
@@ -13,21 +13,21 @@ class ParticleSystem {
   bool looping;
 
   // Lerpable<double> startDelay;
-  Lerpable<double> startLifetime;
-  Lerpable<double> startVelocity;
-  Lerpable<double>? speedOverLifetime;
-  Lerpable<double> startRotationVelocity;
-  Lerpable<double>? rotationSpeedOverLifetime;
-  Lerpable<double> startSizeX;
-  Lerpable<double>? sizeXOverLifetime;
-  Lerpable<double> startSizeY;
-  Lerpable<double>? sizeYOverLifetime;
-  Lerpable<double> startRotation;
-  Lerpable<double> startScale;
-  Lerpable<double> startOpacity;
-  Lerpable<double>? opacityOverLifetime;
-  Lerpable<Color> startColor;
-  Lerpable<Color>? colorOverLifetime;
+  Animatable<double> startLifetime;
+  Animatable<double> startVelocity;
+  Animatable<double>? speedOverLifetime;
+  Animatable<double> startRotationVelocity;
+  Animatable<double>? rotationSpeedOverLifetime;
+  Animatable<double> startSizeX;
+  Animatable<double>? sizeXOverLifetime;
+  Animatable<double> startSizeY;
+  Animatable<double>? sizeYOverLifetime;
+  Animatable<double> startRotation;
+  Animatable<double> startScale;
+  Animatable<double> startOpacity;
+  Animatable<double>? opacityOverLifetime;
+  Animatable<Color?> startColor;
+  Animatable<Color?>? colorOverLifetime;
 
   int maxParticles;
 
@@ -63,9 +63,14 @@ class ParticleSystem {
     required this.maxParticles,
     required this.rateOverTime,
     required this.shape,
-  });
+  }) {
+    print('khoi tao ParticleSystem');
+  }
 
   void update(double deltaTime) {
+    /// giới hạn để tránh brust
+    deltaTime = max(deltaTime, 0.05);
+
     _timeSinceLastEmission += deltaTime;
     _systemElapsedTime += deltaTime;
 
@@ -86,9 +91,11 @@ class ParticleSystem {
       _timeSinceLastEmission -= particlesToEmit / rateOverTime;
     }
 
-    for (int i = 0;
-        i < particlesToEmit && particles.length < maxParticles;
-        i++) {
+    for (
+      int i = 0;
+      i < particlesToEmit && particles.length < maxParticles;
+      i++
+    ) {
       _emitParticle();
     }
 
@@ -102,26 +109,37 @@ class ParticleSystem {
           particle.current.rotationVelocity * deltaTime;
       particle.age += deltaTime;
 
-      particle.current.color =
-          _applyColorAtProgress(particle.initial.color, lifeProgress);
+      particle.current.color = _applyColorAtProgress(
+        particle.initial.color,
+        lifeProgress,
+      );
 
-      particle.current.opacity =
-          _applyOpacityAtProgress(particle.initial.opacity, lifeProgress);
+      particle.current.opacity = _applyOpacityAtProgress(
+        particle.initial.opacity,
+        lifeProgress,
+      );
 
-      particle.current.size =
-          _applySizeAtProgress(particle.initial.size, lifeProgress);
+      particle.current.size = _applySizeAtProgress(
+        particle.initial.size,
+        lifeProgress,
+      );
 
-      particle.current.velocity =
-          _applyVelocityAtProgress(particle.initial.velocity, lifeProgress);
+      particle.current.velocity = _applyVelocityAtProgress(
+        particle.initial.velocity,
+        lifeProgress,
+      );
 
       particle.current.rotationVelocity = _applyRotationVelocityAtProgress(
-          particle.initial.rotationVelocity, lifeProgress);
+        particle.initial.rotationVelocity,
+        lifeProgress,
+      );
     }
   }
 
   Color _applyColorAtProgress(Color color, double lifeProgress) {
     if (colorOverLifetime != null) {
-      final progressColor = colorOverLifetime!.valueAt(lifeProgress);
+      final progressColor =
+          colorOverLifetime!.transform(lifeProgress) ?? Colors.transparent;
       color = Color.alphaBlend(color, progressColor);
     }
     return color;
@@ -129,7 +147,7 @@ class ParticleSystem {
 
   double _applyOpacityAtProgress(double opacity, double lifeProgress) {
     if (opacityOverLifetime != null) {
-      final progressOpacity = opacityOverLifetime!.valueAt(lifeProgress);
+      final progressOpacity = opacityOverLifetime!.transform(lifeProgress);
       opacity = opacity * progressOpacity;
     }
 
@@ -138,12 +156,12 @@ class ParticleSystem {
 
   Size _applySizeAtProgress(Size size, double lifeProgress) {
     if (sizeXOverLifetime != null) {
-      final progressSizeX = sizeXOverLifetime!.valueAt(lifeProgress);
+      final progressSizeX = sizeXOverLifetime!.transform(lifeProgress);
       size = Size(size.width * progressSizeX, size.height);
     }
 
     if (sizeYOverLifetime != null) {
-      final progressSizeY = sizeYOverLifetime!.valueAt(lifeProgress);
+      final progressSizeY = sizeYOverLifetime!.transform(lifeProgress);
       size = Size(size.width, size.height * progressSizeY);
     }
 
@@ -152,7 +170,7 @@ class ParticleSystem {
 
   Offset _applyVelocityAtProgress(Offset velocity, double lifeProgress) {
     if (speedOverLifetime != null) {
-      final progressSpeed = speedOverLifetime!.valueAt(lifeProgress);
+      final progressSpeed = speedOverLifetime!.transform(lifeProgress);
       velocity = velocity * progressSpeed;
     }
 
@@ -160,9 +178,11 @@ class ParticleSystem {
   }
 
   double _applyRotationVelocityAtProgress(
-      double rotationVelocity, double lifeProgress) {
+    double rotationVelocity,
+    double lifeProgress,
+  ) {
     if (rotationSpeedOverLifetime != null) {
-      final progressSpeed = rotationSpeedOverLifetime!.valueAt(lifeProgress);
+      final progressSpeed = rotationSpeedOverLifetime!.transform(lifeProgress);
       rotationVelocity = rotationVelocity * progressSpeed;
     }
 
@@ -175,31 +195,30 @@ class ParticleSystem {
 
     final velocity = direction * _getRandomValue(startVelocity);
     final lifetime = _getRandomValue(startLifetime);
-    final size = Size(
-      _getRandomValue(startSizeX),
-      _getRandomValue(startSizeY),
-    );
-    final color = _getRandomValue(startColor);
+    final size = Size(_getRandomValue(startSizeX), _getRandomValue(startSizeY));
+    final color = _getRandomValue(startColor) ?? Colors.white;
     final rotation = _getRandomValue(startRotation);
     final scale = _getRandomValue(startScale);
     final opacity = _getRandomValue(startOpacity);
     final rotationVelocity = _getRandomValue(startRotationVelocity);
 
-    particles.add(Particle(
-      position: spawnPosition,
-      velocity: velocity,
-      scale: scale,
-      size: size,
-      lifetime: lifetime,
-      color: color,
-      rotation: rotation,
-      rotateVelocity: rotationVelocity,
-      opacity: opacity,
-    ));
+    particles.add(
+      Particle(
+        position: spawnPosition,
+        velocity: velocity,
+        scale: scale,
+        size: size,
+        lifetime: lifetime,
+        color: color,
+        rotation: rotation,
+        rotateVelocity: rotationVelocity,
+        opacity: opacity,
+      ),
+    );
   }
 
-  T _getRandomValue<T>(Lerpable<T> lerper) {
-    return lerper.valueAt(_random.nextDouble());
+  T _getRandomValue<T>(Animatable<T> lerper) {
+    return lerper.transform(_random.nextDouble());
   }
 
   void render(Canvas canvas, bool debugMode) {
@@ -212,8 +231,12 @@ class ParticleSystem {
 
       final state = particle.current;
       if (particle.image != null) {
-        final src = Rect.fromLTWH(0, 0, particle.image!.width.toDouble(),
-            particle.image!.height.toDouble());
+        final src = Rect.fromLTWH(
+          0,
+          0,
+          particle.image!.width.toDouble(),
+          particle.image!.height.toDouble(),
+        );
         final dst = Rect.fromCenter(
           center: state.position,
           width: state.size.width,
@@ -232,10 +255,11 @@ class ParticleSystem {
     }
 
     if (debugMode) {
-      final paint = Paint()
-        ..color = Colors.blue
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
+      final paint =
+          Paint()
+            ..color = Colors.blue
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0;
 
       final shapePath = shape.getShapePath();
       canvas.drawPath(shapePath, paint);

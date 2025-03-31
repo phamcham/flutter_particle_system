@@ -7,11 +7,11 @@ import 'particle_system.dart';
 class ParticleSystemWidget extends StatefulWidget {
   const ParticleSystemWidget({
     super.key,
-    required this.particleSystem,
+    required this.create,
     required this.debug,
   });
 
-  final ParticleSystem particleSystem;
+  final ParticleSystem Function(BuildContext context) create;
   final bool debug;
 
   @override
@@ -19,13 +19,18 @@ class ParticleSystemWidget extends StatefulWidget {
 }
 
 class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late Ticker _ticker;
+  late ParticleSystem _system;
 
   @override
   void initState() {
     super.initState();
 
+    _system = widget.create(context);
     _ticker = createTicker(_tick)..start();
   }
 
@@ -40,7 +45,7 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
     double deltaTime = (elapsed - _lastFrameTime!).inMilliseconds / 1000.0;
     _lastFrameTime = elapsed;
 
-    widget.particleSystem.update(deltaTime);
+    _system.update(deltaTime);
 
     setState(() {});
   }
@@ -54,10 +59,10 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: ParticlePainter(
-        widget.particleSystem,
-        debug: widget.debug,
+    super.build(context);
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: ParticlePainter(_system, debug: widget.debug),
       ),
     );
   }
@@ -65,7 +70,7 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
   @override
   void dispose() {
     _ticker.dispose();
-    widget.particleSystem.dispose();
+    _system.dispose();
     super.dispose();
   }
 }

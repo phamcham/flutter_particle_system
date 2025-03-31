@@ -47,7 +47,7 @@ class Particle {
     double rotateVelocity = 0,
     double rotation = 0,
     Color color = Colors.white,
-    BlendMode blendMode = BlendMode.srcIn,
+    BlendMode blendMode = BlendMode.srcOver,
     required Size size,
     double opacity = 1,
     required double lifetime,
