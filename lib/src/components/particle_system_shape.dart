@@ -21,9 +21,10 @@ Offset _rotateDirection(Offset direction, double rotation) {
 }
 
 Path _rotatePath(Path path, double rotation) {
-  final Matrix4 matrix = Matrix4.identity()
-    ..translate(0.0, 0.0)
-    ..rotateZ(-rotation);
+  final Matrix4 matrix =
+      Matrix4.identity()
+        ..translate(0.0, 0.0)
+        ..rotateZ(-rotation);
 
   return path.transform(matrix.storage);
 }
@@ -72,22 +73,30 @@ class ConeShape extends ParticleSystemShape {
   Path getShapePath() {
     Path path = Path();
 
-    double halfAngle = angle / 2;
+    final halfAngle = angle / 2;
 
     // Đáy nhỏ
-    Offset smallBaseLeft = Offset(0, -radius);
-    Offset smallBaseRight = Offset(0, radius);
+    final smallBaseLeft = Offset(0, -radius);
+    final smallBaseRight = Offset(0, radius);
 
     // Đáy lớn
-    double deltaX = radius * math.tan(halfAngle);
-    Offset largeBaseLeft = Offset(radius, -radius - deltaX);
-    Offset largeBaseRight = Offset(radius, radius + deltaX);
+    final height = radius * 2;
+    final deltaY = height * math.tan(halfAngle);
+    final largeBaseLeft = Offset(height, -radius - deltaY);
+    final largeBaseRight = Offset(height, radius + deltaY);
 
     // Vẽ hình thang
     path.moveTo(smallBaseLeft.dx, smallBaseLeft.dy);
     path.lineTo(largeBaseLeft.dx, largeBaseLeft.dy);
     path.lineTo(largeBaseRight.dx, largeBaseRight.dy);
     path.lineTo(smallBaseRight.dx, smallBaseRight.dy);
+    path.close();
+
+    final direction = Offset(3 * radius, 0);
+
+    path.moveTo(0, 0);
+    path.lineTo(0 + direction.dx, 0 + direction.dy);
+
     path.close();
 
     return _rotatePath(path, rotation);

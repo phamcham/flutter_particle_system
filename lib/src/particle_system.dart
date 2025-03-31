@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'components/texture_loader.dart';
 import 'components/particle_system_shape.dart';
 // import 'components/value_range.dart';
 import 'particle.dart';
@@ -13,21 +14,22 @@ class ParticleSystem {
   bool looping;
 
   // Lerpable<double> startDelay;
-  Animatable<double> startLifetime;
-  Animatable<double> startVelocity;
+  final Animatable<double> startLifetime;
+  final Animatable<double> startVelocity;
   Animatable<double>? speedOverLifetime;
-  Animatable<double> startRotationVelocity;
+  final Animatable<double> startRotationVelocity;
   Animatable<double>? rotationSpeedOverLifetime;
-  Animatable<double> startSizeX;
+  final Animatable<double> startSizeX;
   Animatable<double>? sizeXOverLifetime;
-  Animatable<double> startSizeY;
+  final Animatable<double> startSizeY;
   Animatable<double>? sizeYOverLifetime;
-  Animatable<double> startRotation;
-  Animatable<double> startScale;
-  Animatable<double> startOpacity;
+  final Animatable<double> startRotation;
+  final Animatable<double> startScale;
+  final Animatable<double> startOpacity;
   Animatable<double>? opacityOverLifetime;
-  Animatable<Color?> startColor;
+  final Animatable<Color?> startColor;
   Animatable<Color?>? colorOverLifetime;
+  final List<TextureLoader>? textureSheet;
 
   int maxParticles;
 
@@ -38,12 +40,16 @@ class ParticleSystem {
 
   double _timeSinceLastEmission = 0;
   double _systemElapsedTime = 0;
+  bool _playing = false;
+  bool _debugBoundParticles = false;
+  bool _debugBoundShape = false;
 
   final Random _random = Random();
 
   ParticleSystem({
     required this.duration,
     required this.looping,
+    required bool autoPlay,
     // required this.startDelay,
     required this.startLifetime,
     required this.startVelocity,
@@ -63,13 +69,49 @@ class ParticleSystem {
     required this.maxParticles,
     required this.rateOverTime,
     required this.shape,
-  }) {
-    print('khoi tao ParticleSystem');
+    this.textureSheet,
+  }) : _playing = autoPlay {
+    if (_playing) play();
+  }
+
+  void play() {
+    _playing = true;
+  }
+
+  void stop() {
+    _playing = false;
+  }
+
+  void clear() {
+    _clearParticles(particles);
+  }
+
+  void reset() {
+    _clearParticles(particles);
+    _timeSinceLastEmission = 0;
+    _systemElapsedTime = 0;
+  }
+
+  void _clearParticles(List<Particle> clearedParticles) {
+    for (var particle in [...clearedParticles]) {
+      particle.dispose();
+      particles.removeWhere((e) => e.id == particle.id);
+    }
+  }
+
+  void setDebugBoundParticles(bool active) {
+    _debugBoundParticles = active;
+  }
+
+  void setDebugBoundShape(bool active) {
+    _debugBoundShape = active;
   }
 
   void update(double deltaTime) {
+    if (!_playing) return;
+
     /// giới hạn để tránh brust
-    deltaTime = max(deltaTime, 0.05);
+    deltaTime = min(deltaTime, 0.05);
 
     _timeSinceLastEmission += deltaTime;
     _systemElapsedTime += deltaTime;
@@ -77,11 +119,7 @@ class ParticleSystem {
     // print(_timeSinceLastEmission);
 
     // Xóa các particle đã hết thời gian sống
-    final removedParticles = particles.where((p) => p.age >= p.lifetime);
-    for (var removedParticle in removedParticles) {
-      removedParticle.dispose();
-    }
-    particles.removeWhere((p) => removedParticles.any((e) => e.id == p.id));
+    _clearParticles(particles.where((p) => p.age >= p.lifetime).toList());
 
     // Tính số particle cần phát
     int particlesToEmit = 0;
@@ -201,74 +239,111 @@ class ParticleSystem {
     final scale = _getRandomValue(startScale);
     final opacity = _getRandomValue(startOpacity);
     final rotationVelocity = _getRandomValue(startRotationVelocity);
+    final texture = _getRandomTexture();
 
-    particles.add(
-      Particle(
-        position: spawnPosition,
-        velocity: velocity,
-        scale: scale,
-        size: size,
-        lifetime: lifetime,
-        color: color,
-        rotation: rotation,
-        rotateVelocity: rotationVelocity,
-        opacity: opacity,
-      ),
+    final particle = Particle(
+      position: spawnPosition,
+      velocity: velocity,
+      scale: scale,
+      size: size,
+      lifetime: lifetime,
+      color: color,
+      rotation: rotation,
+      rotateVelocity: rotationVelocity,
+      opacity: opacity,
+      texture: texture,
     );
+
+    particles.add(particle);
   }
 
   T _getRandomValue<T>(Animatable<T> lerper) {
     return lerper.transform(_random.nextDouble());
   }
 
-  void render(Canvas canvas, bool debugMode) {
+  TextureLoader? _getRandomTexture() {
+    final sheet = textureSheet;
+    if (sheet == null) return null;
+    assert(sheet.isNotEmpty);
+    return sheet[_random.nextInt(sheet.length)];
+  }
+
+  void render(Canvas canvas) {
     for (var particle in particles) {
       final paint = Paint();
-      canvas.save();
       // TODO: thêm rotation
       // canvas.translate(particle.position.dx, particle.position.dy);
       // canvas.rotate(particle.rotation);
 
       final state = particle.current;
-      if (particle.image != null) {
+
+      canvas.save();
+      canvas.translate(state.position.dx, state.position.dy);
+      canvas.scale(particle.current.scale);
+
+      paint.color = state.color.withValues(alpha: state.opacity);
+      paint.blendMode = particle.blendMode;
+
+      final texture = particle.texture?.result;
+      if (texture != null) {
         final src = Rect.fromLTWH(
           0,
           0,
-          particle.image!.width.toDouble(),
-          particle.image!.height.toDouble(),
+          texture.width.toDouble(),
+          texture.height.toDouble(),
         );
         final dst = Rect.fromCenter(
-          center: state.position,
+          center: Offset.zero,
           width: state.size.width,
           height: state.size.height,
         );
-        paint.color = state.color.withValues(alpha: state.opacity);
-        paint.blendMode = particle.blendMode;
-        canvas.drawImageRect(particle.image!, src, dst, paint);
+
+        canvas.drawImageRect(texture, src, dst, paint);
       } else {
-        paint.color = state.color.withValues(alpha: state.opacity);
-        paint.blendMode = particle.blendMode;
-        canvas.drawCircle(state.position, state.size.width / 2, paint);
+        canvas.drawCircle(Offset.zero, state.size.width / 2, paint);
       }
 
       canvas.restore();
+
+      if (_debugBoundParticles) {
+        final debugPaint =
+            Paint()
+              ..color = Colors.green
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.0;
+
+        canvas.drawRect(
+          Rect.fromCenter(
+            center: state.position,
+            width: state.size.width,
+            height: state.size.height,
+          ),
+          debugPaint,
+        );
+      }
     }
 
-    if (debugMode) {
-      final paint =
+    if (_debugBoundShape) {
+      final debugPaint =
           Paint()
             ..color = Colors.blue
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.0;
+            ..strokeWidth = 1.0;
 
       final shapePath = shape.getShapePath();
-      canvas.drawPath(shapePath, paint);
+      canvas.drawPath(shapePath, debugPaint);
     }
   }
 
   void dispose() {
     for (final particle in particles) {
       particle.dispose();
+    }
+
+    if (textureSheet != null) {
+      for (final texture in textureSheet!) {
+        texture.dispose();
+      }
     }
 
     particles.clear();

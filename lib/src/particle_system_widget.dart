@@ -5,14 +5,9 @@ import 'particle_painter.dart';
 import 'particle_system.dart';
 
 class ParticleSystemWidget extends StatefulWidget {
-  const ParticleSystemWidget({
-    super.key,
-    required this.create,
-    required this.debug,
-  });
+  const ParticleSystemWidget({super.key, required this.create});
 
   final ParticleSystem Function(BuildContext context) create;
-  final bool debug;
 
   @override
   State<ParticleSystemWidget> createState() => _ParticleSystemWidgetState();
@@ -61,9 +56,7 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
   Widget build(BuildContext context) {
     super.build(context);
     return RepaintBoundary(
-      child: CustomPaint(
-        painter: ParticlePainter(_system, debug: widget.debug),
-      ),
+      child: CustomPaint(painter: ParticlePainter(_system)),
     );
   }
 

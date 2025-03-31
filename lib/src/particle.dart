@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'components/texture_loader.dart';
+
 class ParticleState {
   Offset position;
   double rotation;
@@ -35,10 +37,10 @@ class Particle {
   double lifetime;
   double age;
 
-  ui.Image? image;
-
   bool isDead;
   bool _disposed = false;
+
+  TextureLoader? texture;
 
   factory Particle({
     required Offset position,
@@ -51,6 +53,7 @@ class Particle {
     required Size size,
     double opacity = 1,
     required double lifetime,
+    required TextureLoader? texture,
   }) {
     return Particle._(
       id: _getAutoIncrementId(),
@@ -78,6 +81,7 @@ class Particle {
       lifetime: lifetime,
       age: 0,
       isDead: false,
+      texture: texture,
     );
   }
 
@@ -89,13 +93,14 @@ class Particle {
     required this.lifetime,
     required this.age,
     required this.isDead,
+    required this.texture,
   });
+
+  void setImage(ui.Image image) {}
 
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-
-    image?.dispose();
   }
 }
 
