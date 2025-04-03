@@ -5,9 +5,16 @@ import 'package:flutter/services.dart';
 import '../package_bundle.dart';
 
 final _softCircleTexturePath = 'assets/particles/particle_soft_circle.png';
-TextureLoader createSoftCircleTexture() => TextureLoader(
+final _squareTexturePath = 'assets/particles/particle_square.jpg';
+
+TextureLoader createSoftCircleTexture() =>
+    _createTexture(_softCircleTexturePath);
+
+TextureLoader createSquareTexture() => _createTexture(_squareTexturePath);
+
+TextureLoader _createTexture(String path) => TextureLoader(
   loadBytes: () async {
-    final byteData = await packageBundle.load(_softCircleTexturePath);
+    final byteData = await packageBundle.load(path);
     final bytes = byteData.buffer.asUint8List();
     return bytes;
   },

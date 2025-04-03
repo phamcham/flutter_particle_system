@@ -1,23 +1,19 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:vector_math/vector_math_64.dart' as vmath;
 
 abstract class ParticleSystemShape {
   final random = math.Random();
 
-  Offset getSpawnPosition();
-  Offset getDirection();
+  vmath.Vector2 getSpawnPosition();
+  vmath.Vector2 getDirection();
   Path getShapePath();
 }
 
-Offset _rotateDirection(Offset direction, double rotation) {
-  double cosAngle = math.cos(-rotation);
-  double sinAngle = math.sin(-rotation);
-
-  double rotatedX = direction.dx * cosAngle - direction.dy * sinAngle;
-  double rotatedY = direction.dx * sinAngle + direction.dy * cosAngle;
-
-  return Offset(rotatedX, rotatedY);
+vmath.Vector2 _rotateDirection(vmath.Vector2 direction, double angleRadians) {
+  final rotationMatrix = vmath.Matrix2.rotation(-angleRadians);
+  return rotationMatrix.transformed(direction);
 }
 
 Path _rotatePath(Path path, double rotation) {
@@ -29,20 +25,26 @@ Path _rotatePath(Path path, double rotation) {
   return path.transform(matrix.storage);
 }
 
-Offset _rotatePoint(double x, double y, double rotation) {
-  double cosAngle = math.cos(-rotation);
-  double sinAngle = math.sin(-rotation);
+vmath.Vector2 _rotatePoint(
+  vmath.Vector2 point,
+  vmath.Vector2 pivot,
+  double angleRadians,
+) {
+  final translated = point - pivot;
+  final rotated = vmath.Matrix2.rotation(-angleRadians).transformed(translated);
 
-  double rotatedX = x * cosAngle - y * sinAngle;
-  double rotatedY = x * sinAngle + y * cosAngle;
-
-  return Offset(rotatedX, rotatedY);
+  return rotated + pivot;
 }
 
 class ConeShape extends ParticleSystemShape {
-  final double angle; // Góc tạo bởi hình nón
-  final double radius; // Bán kính của phần gốc
-  final double rotation; // Độ xoay của hình nón
+  /// Góc tạo bởi hình nón
+  final double angle;
+
+  /// Bán kính của phần gốc
+  final double radius;
+
+  /// Độ xoay của hình nón
+  final double rotation;
 
   ConeShape({
     required this.angle,
@@ -51,20 +53,22 @@ class ConeShape extends ParticleSystemShape {
   });
 
   @override
-  Offset getSpawnPosition() {
-    double x = 0;
-    double y = random.nextDouble() * 2 * radius - radius;
+  vmath.Vector2 getSpawnPosition() {
+    final position = vmath.Vector2(
+      0,
+      random.nextDouble() * 2 * radius - radius,
+    );
 
-    return _rotatePoint(x, y, rotation);
+    return _rotatePoint(position, vmath.Vector2.zero(), rotation);
   }
 
   @override
-  Offset getDirection() {
+  vmath.Vector2 getDirection() {
     double halfAngle = angle / 2;
     double spread = (random.nextDouble() * angle) - halfAngle;
 
     // Vector hướng mặc định trong Unity là (1, 0) - sang phải
-    Offset direction = Offset(math.cos(spread), math.sin(spread));
+    final direction = vmath.Vector2(math.cos(spread), math.sin(spread));
 
     return _rotateDirection(direction, rotation);
   }

@@ -1,15 +1,18 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:vector_math/vector_math_64.dart' as vmath;
 
 import 'components/texture_loader.dart';
 
 class ParticleState {
-  Offset position;
-  double rotation;
-  Offset velocity;
+  vmath.Vector2 position;
+  vmath.Quaternion rotation;
+
+  /// vận tốc lẫn hướng của nó
+  vmath.Vector2 velocity;
+
   double scale;
-  double rotationVelocity;
   Color color;
   Size size;
   double opacity;
@@ -19,7 +22,6 @@ class ParticleState {
     required this.rotation,
     required this.velocity,
     required this.scale,
-    required this.rotationVelocity,
     required this.color,
     required this.size,
     required this.opacity,
@@ -43,11 +45,10 @@ class Particle {
   TextureLoader? texture;
 
   factory Particle({
-    required Offset position,
-    required Offset velocity,
+    required vmath.Vector2 position,
+    required vmath.Vector2 velocity,
     double scale = 1,
-    double rotateVelocity = 0,
-    double rotation = 0,
+    vmath.Quaternion? rotation,
     Color color = Colors.white,
     BlendMode blendMode = BlendMode.srcOver,
     required Size size,
@@ -55,6 +56,8 @@ class Particle {
     required double lifetime,
     required TextureLoader? texture,
   }) {
+    rotation ??= vmath.Quaternion.identity();
+
     return Particle._(
       id: _getAutoIncrementId(),
       initial: ParticleState(
@@ -62,7 +65,6 @@ class Particle {
         rotation: rotation,
         velocity: velocity,
         scale: scale,
-        rotationVelocity: rotateVelocity,
         color: color,
         size: size,
         opacity: opacity,
@@ -72,7 +74,6 @@ class Particle {
         rotation: rotation,
         velocity: velocity,
         scale: scale,
-        rotationVelocity: rotateVelocity,
         color: color,
         size: size,
         opacity: opacity,

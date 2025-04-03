@@ -4,28 +4,45 @@ import 'package:flutter/scheduler.dart';
 import 'particle_painter.dart';
 import 'particle_system.dart';
 
-class ParticleSystemWidget extends StatefulWidget {
-  const ParticleSystemWidget({super.key, required this.create});
+typedef ParticleSystemCreate = ParticleSystem Function(BuildContext context);
 
-  final ParticleSystem Function(BuildContext context) create;
+class ParticleSystemWidget extends StatefulWidget {
+  /// widget sẽ huỷ particle khi dispose. Dùng để tạo ngay ParticleSystem
+  const ParticleSystemWidget({super.key, required ParticleSystemCreate create})
+    : _create = create,
+      _value = null,
+      _autoDispose = true;
+
+  /// Tự dispose particlesystem sau khi dùng xong. Dùng khi có một tham chiếu
+  /// khác tới ParticleSystem cần xử lý thủ công
+  const ParticleSystemWidget.value({super.key, required ParticleSystem value})
+    : _value = value,
+      _create = null,
+      _autoDispose = false;
+
+  final ParticleSystemCreate? _create;
+  final ParticleSystem? _value;
+  final bool _autoDispose;
 
   @override
   State<ParticleSystemWidget> createState() => _ParticleSystemWidgetState();
 }
 
 class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
+    with SingleTickerProviderStateMixin {
   late Ticker _ticker;
-  late ParticleSystem _system;
+  late ParticleSystem? _system;
 
   @override
   void initState() {
     super.initState();
 
-    _system = widget.create(context);
+    if (widget._create != null) {
+      _system = widget._create!(context);
+    } else {
+      _system = widget._value!;
+    }
+
     _ticker = createTicker(_tick)..start();
   }
 
@@ -40,7 +57,7 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
     double deltaTime = (elapsed - _lastFrameTime!).inMilliseconds / 1000.0;
     _lastFrameTime = elapsed;
 
-    _system.update(deltaTime);
+    _system?.update(deltaTime);
 
     setState(() {});
   }
@@ -54,16 +71,22 @@ class _ParticleSystemWidgetState extends State<ParticleSystemWidget>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    if (_system == null) return SizedBox.shrink();
+
     return RepaintBoundary(
-      child: CustomPaint(painter: ParticlePainter(_system)),
+      child: CustomPaint(painter: ParticlePainter(_system!)),
     );
   }
 
   @override
   void dispose() {
     _ticker.dispose();
-    _system.dispose();
+
+    if (widget._autoDispose) {
+      _system?.dispose();
+      _system = null;
+    }
+
     super.dispose();
   }
 }
