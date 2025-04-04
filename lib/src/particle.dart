@@ -7,6 +7,7 @@ import 'components/texture_loader.dart';
 
 class ParticleState {
   vmath.Vector2 position;
+
   vmath.Quaternion rotation;
 
   /// vận tốc lẫn hướng của nó

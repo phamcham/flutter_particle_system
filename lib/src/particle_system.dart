@@ -29,7 +29,8 @@ class ParticleSystem {
   /// các giá trị sẽ được khởi tạo một lần với mỗi particle
   final MainModule initial;
 
-  /// vận tốc này sẽ được cộng với vận tốc ban đầu
+  /// Vận tốc này sẽ được cộng với vận tốc ban đầu
+  /// (Không phải velocity hiện tại)
   VelocityOverLifetimeModule? velocityOverLifetime;
 
   /// Unity là SizeOverLifetime (thực chất là scale)
@@ -156,7 +157,6 @@ class ParticleSystem {
 
       particle.current.velocity = _applyVelocityAtProgress(
         particle.initial.velocity,
-        particle.current.rotation,
         lifeProgress,
       );
 
@@ -217,27 +217,16 @@ class ParticleSystem {
 
   /// vận tốc cũng bị chi phối bởi noise
   vmath.Vector2 _applyVelocityAtProgress(
-    vmath.Vector2 currentVelocity,
-    vmath.Quaternion currentRotation,
+    vmath.Vector2 initialVelocity,
     double lifeProgress,
   ) {
     final module = velocityOverLifetime;
     if (module == null) {
-      return currentVelocity;
+      return initialVelocity;
     }
 
-    vmath.Vector2 velocity = currentVelocity;
+    vmath.Vector2 velocity = initialVelocity;
     final progressVelocity = velocityOverLifetime!.evaluate(lifeProgress);
-
-    if (!velocityOverLifetime!.inWorldSpace) {
-      // Nếu là local space, ta xoay progressVelocity theo currentRotation
-      final rotationMatrix = vmath.Matrix3.rotationZ(currentRotation.z);
-      final transformedVelocity = rotationMatrix.transform(
-        vmath.Vector3(progressVelocity.x, progressVelocity.y, 0),
-      );
-
-      velocity += transformedVelocity.xy;
-    }
 
     return velocity + progressVelocity.xy;
   }
@@ -341,15 +330,40 @@ class ParticleSystem {
       paint.isAntiAlias = textureSheet?.isAntiAlias ?? true;
       final state = particle.current;
 
+      vmath.Vector2 deltaPosition = vmath.Vector2.zero();
+      final originPosition = state.position;
+      final originScale = state.scale;
+      final originRotation = state.rotation;
+      final originSize = state.size;
+
+      /// tính toán simulate cho noise
+      if (noiseMovement != null) {
+        final deltaX = noiseMovement!.getDouble(
+          _systemElapsedTime,
+          particle.id * 100 + _systemElapsedTime,
+        );
+
+        final deltaY = noiseMovement!.getDouble(
+          particle.id * 100 + _systemElapsedTime,
+          _systemElapsedTime,
+        );
+
+        deltaPosition = vmath.Vector2(deltaX, deltaY);
+      }
+
       canvas.save();
 
-      final rotateMatrix =
+      final transformMatrix =
           Matrix4.identity()..setFromTranslationRotationScale(
-            vmath.Vector3(state.position.x, state.position.y, 0),
-            state.rotation,
-            vmath.Vector3.all(state.scale),
+            vmath.Vector3(
+              originPosition.x + deltaPosition.x,
+              originPosition.y + deltaPosition.y,
+              0,
+            ),
+            originRotation,
+            vmath.Vector3.all(originScale),
           );
-      canvas.transform(rotateMatrix.storage);
+      canvas.transform(transformMatrix.storage);
 
       final color = state.color.withValues(alpha: state.opacity);
       paint.color = color;
@@ -365,15 +379,15 @@ class ParticleSystem {
         );
         final dst = Rect.fromCenter(
           center: Offset.zero,
-          width: state.size.width,
-          height: state.size.height,
+          width: originSize.width,
+          height: originSize.height,
         );
 
         paint.colorFilter = ColorFilter.mode(color, BlendMode.srcATop);
         canvas.drawImageRect(texture, src, dst, paint);
       } else {
         paint.blendMode = particle.blendMode;
-        canvas.drawCircle(Offset.zero, state.size.width / 2, paint);
+        canvas.drawCircle(Offset.zero, originSize.shortestSide / 2, paint);
       }
 
       canvas.restore();
@@ -387,9 +401,9 @@ class ParticleSystem {
 
         canvas.drawRect(
           Rect.fromCenter(
-            center: Offset(state.position.x, state.position.y),
-            width: state.size.width,
-            height: state.size.height,
+            center: Offset(originPosition.x, originPosition.y),
+            width: originSize.width,
+            height: originSize.height,
           ),
           debugPaint,
         );

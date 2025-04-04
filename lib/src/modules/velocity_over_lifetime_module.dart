@@ -6,12 +6,10 @@ import '../components/min_max_curve.dart';
 class VelocityOverLifetimeModule {
   MinMaxCurve<double> velocityX;
   MinMaxCurve<double> velocityY;
-  bool inWorldSpace;
 
   VelocityOverLifetimeModule({
     required this.velocityX,
     required this.velocityY,
-    required this.inWorldSpace,
   });
 
   factory VelocityOverLifetimeModule.twoConstants(
@@ -22,7 +20,6 @@ class VelocityOverLifetimeModule {
     return VelocityOverLifetimeModule(
       velocityX: MinMaxCurve.linearTwoConstants(min.x, max.x),
       velocityY: MinMaxCurve.linearTwoConstants(min.y, max.y),
-      inWorldSpace: inWorldSpace,
     );
   }
 
