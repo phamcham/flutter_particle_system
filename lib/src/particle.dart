@@ -12,6 +12,10 @@ class ParticleState {
   /// vận tốc lẫn hướng của nó
   vmath.Vector2 velocity;
 
+  /// được điều chỉnh bằng angularVelocityOverLifetime.
+  /// hiện tại nó là inWorldSpace=true
+  vmath.Vector3 angularVelocity;
+
   double scale;
   Color color;
   Size size;
@@ -21,6 +25,7 @@ class ParticleState {
     required this.position,
     required this.rotation,
     required this.velocity,
+    required this.angularVelocity,
     required this.scale,
     required this.color,
     required this.size,
@@ -47,6 +52,7 @@ class Particle {
   factory Particle({
     required vmath.Vector2 position,
     required vmath.Vector2 velocity,
+    required vmath.Vector3 angularVelocity,
     double scale = 1,
     vmath.Quaternion? rotation,
     Color color = Colors.white,
@@ -64,6 +70,7 @@ class Particle {
         position: position,
         rotation: rotation,
         velocity: velocity,
+        angularVelocity: angularVelocity,
         scale: scale,
         color: color,
         size: size,
@@ -73,6 +80,7 @@ class Particle {
         position: position,
         rotation: rotation,
         velocity: velocity,
+        angularVelocity: angularVelocity,
         scale: scale,
         color: color,
         size: size,

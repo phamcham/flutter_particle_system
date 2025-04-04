@@ -3,10 +3,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' as vmath;
 
-import 'components/lerpable.dart';
-import 'components/texture_loader.dart';
-import 'components/particle_system_shape.dart';
 // import 'components/value_range.dart';
+import 'components/min_max_curve.dart';
+import 'modules/angular_velocity_over_lifetime_module.dart';
+import 'modules/color_over_lifetime_module.dart';
+import 'modules/main_module.dart';
+import 'modules/noise_module.dart';
+import 'modules/opacity_over_lifetime_module.dart';
+import 'modules/scale_over_lifetime_module.dart';
+import 'modules/texture_sheet_module.dart';
 import 'modules/velocity_over_lifetime_module.dart';
 import 'particle.dart';
 
@@ -21,39 +26,19 @@ class ParticleSystem {
   bool looping;
 
   // Lerpable<double> startDelay;
-  final Lerpable<double> startLifetime;
-  final Lerpable<double> startSpeed;
-  // Lerpable<double>? speedOverLifetime;
-  final Lerpable<Size> startSize;
-  final Lerpable<double> startScale;
-  final Lerpable<double> startOpacity;
-  final Lerpable<Color?> startColor;
-  final Lerpable<vmath.Quaternion> startRotation;
+  /// các giá trị sẽ được khởi tạo một lần với mỗi particle
+  final MainModule initial;
 
   /// vận tốc này sẽ được cộng với vận tốc ban đầu
   VelocityOverLifetimeModule? velocityOverLifetime;
 
   /// Unity là SizeOverLifetime (thực chất là scale)
-  Lerpable<double>? scaleOverLifetime;
-
-  /// Unity là RotationOverLifetime (thực chất là velocity).
-  /// Tốc độ xoay mỗi giây của mỗi particle.
-  /// Hướng thể hiện trục xoay và độ lớn thể hiện vận tốc
-  Lerpable<vmath.Vector3>? angularVelocityOverLifetime;
-  Lerpable<double>? opacityOverLifetime;
-  Lerpable<Color?>? colorOverLifetime;
-
-  /// textures
-  final List<TextureLoader>? textureSheet;
-
-  int maxParticles;
-
-  /// Số particle được emit mỗi giây
-  int rateOverTime;
-
-  bool isAntiAlias;
-
-  ParticleSystemShape shape;
+  ScaleOverLifetimeModule? scaleOverLifetime;
+  // AngularVelocityOverLifetimeModule? angularVelocityOverLifetime;
+  OpacityOverLifetimeModule? opacityOverLifetime;
+  ColorOverLifetimeModule? colorOverLifetime;
+  NoiseModule? noiseMovement;
+  TextureSheetModule? textureSheet;
 
   double _timeSinceLastEmission = 0;
   double _systemElapsedTime = 0;
@@ -62,30 +47,18 @@ class ParticleSystem {
   bool _debugBoundShape = false;
   bool _disposed = false;
 
-  final Random _random = Random();
-
   ParticleSystem({
     required this.duration,
     required this.looping,
     required bool autoPlay,
-    // required this.startDelay,
-    required this.startLifetime,
-    required this.startSpeed,
-    required this.startRotation,
-    required this.startScale,
-    required this.startColor,
-    required this.startOpacity,
-    required this.startSize,
-    this.angularVelocityOverLifetime,
+    required this.initial,
     this.colorOverLifetime,
+    this.scaleOverLifetime,
+    this.velocityOverLifetime,
+    // this.angularVelocityOverLifetime,
     this.opacityOverLifetime,
-    required this.maxParticles,
-    required this.rateOverTime,
-    required this.shape,
+    this.noiseMovement,
     this.textureSheet,
-
-    /// làm mịn ảnh, tắt nếu dùng các ảnh siêu nhỏ mà sắc nét
-    this.isAntiAlias = false,
   }) : _playing = autoPlay {
     if (_playing) play();
   }
@@ -142,13 +115,13 @@ class ParticleSystem {
     int particlesToEmit = 0;
     if (_systemElapsedTime < duration || looping) {
       /// có thể emit thêm particle
-      particlesToEmit = (rateOverTime * _timeSinceLastEmission).floor();
-      _timeSinceLastEmission -= particlesToEmit / rateOverTime;
+      particlesToEmit = (initial.rateOverTime * _timeSinceLastEmission).floor();
+      _timeSinceLastEmission -= particlesToEmit / initial.rateOverTime;
     }
 
     for (
       int i = 0;
-      i < particlesToEmit && particles.length < maxParticles;
+      i < particlesToEmit && particles.length < initial.maxParticles;
       i++
     ) {
       _emitParticle();
@@ -187,9 +160,15 @@ class ParticleSystem {
         lifeProgress,
       );
 
+      // particle.current.angularVelocity = _applyAngularVelocityAtProgress(
+      //   particle.initial.velocity,
+      //   particle.current.rotation,
+      //   lifeProgress,
+      // );
+
       particle.current.rotation = _applyRotationAtProgress(
         particle.current.rotation,
-        lifeProgress,
+        particle.current.angularVelocity,
         deltaTime,
       );
     }
@@ -200,101 +179,129 @@ class ParticleSystem {
     vmath.Vector2 currentVelocity,
     double deltaTime,
   ) {
-    return currentPosition + currentVelocity * deltaTime;
+    final position = currentPosition + currentVelocity * deltaTime;
+
+    if (noiseMovement != null) {
+      //
+    }
+
+    return position;
   }
 
   Color _applyColorAtProgress(Color color, double lifeProgress) {
     if (colorOverLifetime != null) {
-      final progressColor =
-          colorOverLifetime!.valueAt(lifeProgress) ?? Colors.transparent;
+      final progressColor = colorOverLifetime!.color.evaluate(lifeProgress);
       color = Color.alphaBlend(color, progressColor);
     }
     return color;
   }
 
   double _applyOpacityAtProgress(double opacity, double lifeProgress) {
-    if (opacityOverLifetime != null) {
-      final progressOpacity = opacityOverLifetime!.valueAt(lifeProgress);
-      opacity = opacity * progressOpacity;
-    }
+    final module = opacityOverLifetime;
+    if (module == null) return opacity;
+
+    final progressOpacity = module.opacity.evaluate(lifeProgress);
+    opacity = opacity * progressOpacity;
 
     return opacity;
   }
 
   double _applyScaleAtProgress(double initialScale, double lifeProgress) {
     if (scaleOverLifetime != null) {
-      final progressScale = scaleOverLifetime!.valueAt(lifeProgress);
+      final progressScale = scaleOverLifetime!.scale.evaluate(lifeProgress);
       initialScale *= progressScale;
     }
 
     return initialScale;
   }
 
+  /// vận tốc cũng bị chi phối bởi noise
   vmath.Vector2 _applyVelocityAtProgress(
-    vmath.Vector2 initialVelocity,
+    vmath.Vector2 currentVelocity,
     vmath.Quaternion currentRotation,
     double lifeProgress,
   ) {
-    if (velocityOverLifetime != null) {
-      final progressVelocity = velocityOverLifetime!.linear.valueAt(
-        lifeProgress,
-      );
-
-      if (!velocityOverLifetime!.inWorldSpace) {
-        // Nếu là local space, ta xoay progressVelocity theo currentRotation
-        final rotationMatrix = vmath.Matrix3.rotationZ(currentRotation.z);
-        final transformedVelocity = rotationMatrix.transform(
-          vmath.Vector3(progressVelocity.x, progressVelocity.y, 0),
-        );
-
-        initialVelocity += transformedVelocity.xy;
-      } else {
-        initialVelocity += progressVelocity.xy;
-      }
+    final module = velocityOverLifetime;
+    if (module == null) {
+      return currentVelocity;
     }
 
-    return initialVelocity;
+    vmath.Vector2 velocity = currentVelocity;
+    final progressVelocity = velocityOverLifetime!.evaluate(lifeProgress);
+
+    if (!velocityOverLifetime!.inWorldSpace) {
+      // Nếu là local space, ta xoay progressVelocity theo currentRotation
+      final rotationMatrix = vmath.Matrix3.rotationZ(currentRotation.z);
+      final transformedVelocity = rotationMatrix.transform(
+        vmath.Vector3(progressVelocity.x, progressVelocity.y, 0),
+      );
+
+      velocity += transformedVelocity.xy;
+    }
+
+    return velocity + progressVelocity.xy;
   }
+
+  // vmath.Vector3 _applyAngularVelocityAtProgress(
+  //   vmath.Vector3 currentAngularVelocity,
+  //   double lifeProgress,
+  // ) {
+  //   final module = angularVelocityOverLifetime;
+  //   if (module == null) return currentAngularVelocity;
+
+  //   final angularVelocity = currentAngularVelocity;
+  //   if (module.angularVelocityX.mode == ParticleSystemCurveMode.curve) {
+  //     angularVelocity.x = module.angularVelocityX.evaluate(lifeProgress);
+  //   }
+
+  //   if (module.angularVelocityY.mode == ParticleSystemCurveMode.curve) {
+  //     angularVelocity.y = module.angularVelocityY.evaluate(lifeProgress);
+  //   }
+
+  //   if (module.angularVelocityZ.mode == ParticleSystemCurveMode.curve) {
+  //     angularVelocity.z = module.angularVelocityZ.evaluate(lifeProgress);
+  //   }
+
+  //   return angularVelocity;
+  // }
 
   vmath.Quaternion _applyRotationAtProgress(
     vmath.Quaternion currentRotation,
-    double lifeProgress,
+    vmath.Vector3 currentAngularVelocity,
     double deltaTime,
   ) {
-    if (angularVelocityOverLifetime != null) {
-      final progressRotationVelocity = angularVelocityOverLifetime!.valueAt(
-        lifeProgress,
-      );
-
-      final deltaRotation = vmath.Quaternion.axisAngle(
-        progressRotationVelocity.normalized(),
-        progressRotationVelocity.length * deltaTime,
-      );
-
-      return deltaRotation * currentRotation;
+    if (currentAngularVelocity == vmath.Vector3.zero()) {
+      return currentRotation;
     }
 
-    return currentRotation;
+    final deltaRotation = vmath.Quaternion.axisAngle(
+      currentAngularVelocity.normalized(),
+      currentAngularVelocity.length * deltaTime,
+    );
+
+    return deltaRotation * currentRotation;
   }
 
   void _emitParticle() {
-    final spawnPosition = shape.getSpawnPosition();
-    final direction = shape.getDirection();
+    final spawnPosition = initial.shape.getSpawnPosition();
+    final direction = initial.shape.getDirection();
 
-    final velocity = direction * _getRandomValue(startSpeed);
-    final lifetime = _getRandomValue(startLifetime);
-    final size = _getRandomValue(startSize);
-    final color = _getRandomValue(startColor) ?? Colors.white;
-    final rotation = _getRandomValue(startRotation);
-    final scale = _getRandomValue(startScale);
-    final opacity = _getRandomValue(startOpacity);
-    final texture = _getRandomTexture();
+    final velocity = direction * initial.speed.evaluate(_randomDouble());
 
-    // print(color);
+    /// vector3 random từng số
+    final angularVelocity = _randomVector3(initial.angularVelocity);
+    final lifetime = initial.lifetime.randomOnEvaluate();
+    final size = initial.size.randomOnEvaluate();
+    final color = initial.color.randomOnEvaluate();
+    final rotation = initial.rotation.randomOnEvaluate();
+    final scale = initial.scale.randomOnEvaluate();
+    final opacity = initial.opacity.randomOnEvaluate();
+    final texture = textureSheet?.random();
 
     final particle = Particle(
       position: spawnPosition,
       velocity: velocity,
+      angularVelocity: angularVelocity,
       scale: scale,
       size: size,
       lifetime: lifetime,
@@ -307,15 +314,23 @@ class ParticleSystem {
     particles.add(particle);
   }
 
-  T _getRandomValue<T>(Lerpable<T> lerper) {
-    return lerper.valueAt(_random.nextDouble());
+  double _randomDouble([Random? rnd]) {
+    final t = (rnd ?? Random()).nextInt(100_001) / 100_000;
+    return t;
   }
 
-  TextureLoader? _getRandomTexture() {
-    final sheet = textureSheet;
-    if (sheet == null) return null;
-    assert(sheet.isNotEmpty);
-    return sheet[_random.nextInt(sheet.length)];
+  vmath.Vector3 _randomVector3(
+    MinMaxCurve<vmath.Vector3> minMax, [
+    Random? rnd,
+  ]) {
+    final min = minMax.constantMin;
+    final max = minMax.constantMax;
+
+    return vmath.Vector3(
+      min.x + (_randomDouble(rnd) * (max.x - min.x)),
+      min.y + (_randomDouble(rnd) * (max.y - min.y)),
+      min.z + (_randomDouble(rnd) * (max.z - min.z)),
+    );
   }
 
   void render(Canvas canvas) {
@@ -323,8 +338,7 @@ class ParticleSystem {
 
     for (var particle in particles) {
       final paint = Paint();
-      paint.isAntiAlias = isAntiAlias;
-
+      paint.isAntiAlias = textureSheet?.isAntiAlias ?? true;
       final state = particle.current;
 
       canvas.save();
@@ -389,7 +403,7 @@ class ParticleSystem {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.0;
 
-      final shapePath = shape.getShapePath();
+      final shapePath = initial.shape.getShapePath();
       canvas.drawPath(shapePath, debugPaint);
     }
   }
@@ -403,7 +417,7 @@ class ParticleSystem {
     }
 
     if (textureSheet != null) {
-      for (final texture in textureSheet!) {
+      for (final texture in textureSheet!.textureSheet) {
         texture.dispose();
       }
     }

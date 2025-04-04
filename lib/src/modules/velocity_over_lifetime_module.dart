@@ -1,14 +1,32 @@
 import 'package:vector_math/vector_math_64.dart' as vmath;
 
-import '../components/lerpable.dart';
+import '../components/min_max_curve.dart';
 
 /// Vận tốc thay đổi theo thời gian. Kết quả được cộng với giá trị ban đầu.
 class VelocityOverLifetimeModule {
-  Lerpable<vmath.Vector2> linear;
+  MinMaxCurve<double> velocityX;
+  MinMaxCurve<double> velocityY;
   bool inWorldSpace;
 
   VelocityOverLifetimeModule({
-    required this.linear,
+    required this.velocityX,
+    required this.velocityY,
     required this.inWorldSpace,
   });
+
+  factory VelocityOverLifetimeModule.twoConstants(
+    vmath.Vector2 min,
+    vmath.Vector2 max, {
+    required bool inWorldSpace,
+  }) {
+    return VelocityOverLifetimeModule(
+      velocityX: MinMaxCurve.linearTwoConstants(min.x, max.x),
+      velocityY: MinMaxCurve.linearTwoConstants(min.y, max.y),
+      inWorldSpace: inWorldSpace,
+    );
+  }
+
+  vmath.Vector2 evaluate(double time) {
+    return vmath.Vector2(velocityX.evaluate(time), velocityY.evaluate(time));
+  }
 }

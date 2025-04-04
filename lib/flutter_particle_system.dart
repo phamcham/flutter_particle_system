@@ -1,7 +1,14 @@
-export 'src/components/lerpable.dart';
+export 'src/components/min_max_curve.dart';
 export 'src/components/particle_system_shape.dart';
 export 'src/components/texture_loader.dart';
 
+export 'src/modules/angular_velocity_over_lifetime_module.dart';
+export 'src/modules/color_over_lifetime_module.dart';
+export 'src/modules/main_module.dart';
+export 'src/modules/noise_module.dart';
+export 'src/modules/opacity_over_lifetime_module.dart';
+export 'src/modules/scale_over_lifetime_module.dart';
+export 'src/modules/texture_sheet_module.dart';
 export 'src/modules/velocity_over_lifetime_module.dart';
 
 export 'src/particle_painter.dart';
